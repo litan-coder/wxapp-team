@@ -5,10 +5,7 @@
       <text class="header-title">管理后台</text>
       <text class="header-user">🔑 管理员</text>
     </view>
-    <view class="header-right">
-      <button class="home-btn" bindtap="onHome">🏠</button>
-      <button class="logout-btn" bindtap="onLogout">退出</button>
-    </view>
+    <button class="header-exit-btn" bindtap="onHome">↩ 返回首页</button>
   </view>
 
   <!-- 统计面板 -->

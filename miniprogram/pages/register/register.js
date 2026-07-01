@@ -180,24 +180,14 @@ Page({
 
   /** 返回首页 */
   onHome() {
-    auth.clearAuth();
-    wx.reLaunch({ url: '/pages/index/index' });
-    api.logout().catch(() => {});
-  },
-
-  /** 退出登录 */
-  onLogout() {
     wx.showModal({
       title: '提示',
-      content: '确定要退出登录吗？',
+      content: '确定要返回首页吗？',
+      confirmColor: '#4f6ef7',
       success: (res) => {
         if (!res.confirm) return;
-
-        // 先清除登录状态，再跳转，避免 401 触发的 handle401 导致双重 reLaunch
         auth.clearAuth();
         wx.reLaunch({ url: '/pages/index/index' });
-
-        // 通知后端（fire-and-forget，不阻塞跳转）
         api.logout().catch(() => {});
       }
     });

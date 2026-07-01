@@ -1,14 +1,11 @@
 <view class="container" bindtouchstart="onSwipeStart" bindtouchmove="onSwipeMove" bindtouchend="onSwipeEnd">
-  <!-- 顶部：用户名 + 退出 -->
+  <!-- 顶部栏 -->
   <view class="header">
     <view class="header-left">
       <text class="header-title">团队登记</text>
       <text class="header-user">👤 {{name}}</text>
     </view>
-    <view class="header-right">
-      <button class="home-btn" bindtap="onHome">🏠</button>
-      <button class="logout-btn" bindtap="onLogout">退出</button>
-    </view>
+    <button class="header-exit-btn" bindtap="onHome">↩ 返回首页</button>
   </view>
 
   <!-- 统计面板 -->

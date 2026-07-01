@@ -1,0 +1,16 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/register/register",
+    "pages/edit/edit",
+    "pages/admin/admin"
+  ],
+  "window": {
+    "navigationBarTitleText": "团队信息登记",
+    "navigationBarBackgroundColor": "#4f6ef7",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f0f2f5"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

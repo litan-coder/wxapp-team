@@ -1,0 +1,87 @@
+<view class="container">
+  <!-- 顶部栏 -->
+  <view class="header">
+    <view class="header-left">
+      <text class="header-title">管理后台</text>
+      <text class="header-user">🔑 管理员</text>
+    </view>
+    <button class="logout-btn" bindtap="onLogout">退出</button>
+  </view>
+
+  <!-- 统计面板 -->
+  <view class="card">
+    <view class="card-title">📊 数据统计</view>
+
+    <!-- 基本统计 -->
+    <view class="stats-grid">
+      <view class="stat-item">
+        <text class="stat-value">{{total}}</text>
+        <text class="stat-label">总登记</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value male">{{maleCount}}</text>
+        <text class="stat-label">男</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value female">{{femaleCount}}</text>
+        <text class="stat-label">女</text>
+      </view>
+    </view>
+
+    <!-- 年龄分布 -->
+    <view class="stat-section" wx:if="{{total > 0}}">
+      <text class="section-title">📅 年龄分布</text>
+      <view class="bar-chart">
+        <view class="bar-row" wx:for="{{ageGroups}}" wx:key="label" wx:for-item="group">
+          <text class="bar-label">{{group.label}}</text>
+          <view class="bar-track">
+            <view class="bar-fill" style="width: {{group.percent}}%"></view>
+          </view>
+          <text class="bar-value">{{group.count}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 爱好排行 -->
+    <view class="stat-section" wx:if="{{hobbies.length > 0}}">
+      <text class="section-title">🎯 爱好排行</text>
+      <view class="hobby-tags">
+        <text class="hobby-tag" wx:for="{{hobbies}}" wx:key="name" wx:for-item="h">
+          {{h.name}} <text class="hobby-count">×{{h.count}}</text>
+        </text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 全部登记记录 -->
+  <view class="card">
+    <view class="card-title-row">
+      <text class="card-title">👥 全部登记记录</text>
+      <button class="btn-export" bindtap="onExport">📥 导出Excel</button>
+    </view>
+
+    <block wx:if="{{entries.length > 0}}">
+      <view class="entry-item" wx:for="{{entries}}" wx:key="id">
+        <view class="entry-header">
+          <text class="entry-name">{{item.name}}</text>
+          <text class="tag {{item.gender === '男' ? 'tag-male' : 'tag-female'}}">{{item.gender === '男' ? '♂' : '♀'}} {{item.gender}}</text>
+        </view>
+        <view class="entry-info">
+          <text class="info-item">🎂 {{item.age}}岁</text>
+          <text wx:if="{{item.hobby}}" class="info-item">🎯 {{item.hobby}}</text>
+        </view>
+        <view wx:if="{{item.remark}}" class="entry-remark">
+          <text>💬 {{item.remark}}</text>
+        </view>
+        <view class="entry-time">
+          <text>🕐 {{item.createdAt}}</text>
+        </view>
+        <view class="entry-actions">
+          <button class="action-btn delete-btn" bindtap="onDelete" data-id="{{item.id}}">🗑️ 删除</button>
+        </view>
+      </view>
+    </block>
+
+    <view wx:else class="empty">暂无登记记录</view>
+  </view>
+</view>

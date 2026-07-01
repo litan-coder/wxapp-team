@@ -1,0 +1,19 @@
+{
+  "name": "team-register-mini",
+  "version": "1.0.0",
+  "description": "团队信息登记 - 微信小程序后端",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  }
+}

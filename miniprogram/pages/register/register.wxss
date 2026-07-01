@@ -1,0 +1,68 @@
+.container {
+  padding-bottom: 32rpx;
+}
+
+/* 顶部栏 */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 32rpx;
+  background: #4f6ef7;
+  color: #ffffff;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.header-title {
+  font-size: 36rpx;
+  font-weight: 700;
+}
+
+.header-user {
+  font-size: 24rpx;
+  opacity: 0.85;
+  margin-top: 4rpx;
+}
+
+.logout-btn {
+  font-size: 24rpx;
+  padding: 12rpx 24rpx;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-radius: 8rpx;
+  line-height: 1.4;
+  min-height: auto;
+}
+
+.logout-btn::after {
+  border: none;
+}
+
+/* 性别选择 */
+.gender-group {
+  display: flex;
+  gap: 24rpx;
+}
+
+.gender-item {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 32rpx;
+  border: 2rpx solid #e8e8e8;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+}
+
+.gender-item.active {
+  border-color: #4f6ef7;
+  background: #f0f4ff;
+}
+
+/* 备注输入框 */
+.remark-input {
+  height: 160rpx;
+}

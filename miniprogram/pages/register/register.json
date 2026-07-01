@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "团队登记",
+  "usingComponents": {
+    "stats-panel": "/components/stats-panel/stats-panel",
+    "entry-item": "/components/entry-item/entry-item"
+  }
+}

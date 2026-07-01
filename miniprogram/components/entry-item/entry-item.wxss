@@ -1,0 +1,89 @@
+.entry-card {
+  background: #f8f9fa;
+  border-radius: 12rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+}
+
+.entry-card:last-child {
+  margin-bottom: 0;
+}
+
+.entry-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.entry-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333333;
+  margin-right: 16rpx;
+}
+
+.entry-info {
+  display: flex;
+  gap: 32rpx;
+  margin-bottom: 12rpx;
+}
+
+.info-item {
+  font-size: 26rpx;
+  color: #666666;
+}
+
+.entry-hobby {
+  font-size: 26rpx;
+  color: #666666;
+  margin-bottom: 8rpx;
+}
+
+.hobby-label {
+  color: #888888;
+}
+
+.entry-remark {
+  font-size: 26rpx;
+  color: #888888;
+  margin-bottom: 8rpx;
+  padding: 12rpx;
+  background: #f0f0f0;
+  border-radius: 8rpx;
+}
+
+.entry-time {
+  font-size: 24rpx;
+  color: #aaaaaa;
+  margin-bottom: 16rpx;
+}
+
+.entry-actions {
+  display: flex;
+  gap: 16rpx;
+  border-top: 1rpx solid #e8e8e8;
+  padding-top: 16rpx;
+}
+
+.action-btn {
+  flex: 1;
+  font-size: 24rpx;
+  padding: 12rpx 0;
+  border-radius: 8rpx;
+  line-height: 1.4;
+  min-height: auto;
+}
+
+.action-btn::after {
+  border: none;
+}
+
+.edit-btn {
+  background: #e8f0fe;
+  color: #1a73e8;
+}
+
+.delete-btn {
+  background: #fce8e8;
+  color: #e74c3c;
+}

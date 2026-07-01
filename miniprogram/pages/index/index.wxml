@@ -1,0 +1,65 @@
+<view class="login-container">
+  <view class="login-box">
+    <!-- Logo / 标题 -->
+    <view class="login-header">
+      <view class="login-icon">📋</view>
+      <text class="login-title">团队信息登记</text>
+      <text class="login-subtitle">请登录后进行登记操作</text>
+    </view>
+
+    <!-- 登录类型切换 Tab -->
+    <view class="login-tabs">
+      <view
+        class="login-tab {{tab === 'user' ? 'active' : ''}}"
+        data-tab="user"
+        bindtap="onTabChange"
+      >用户登录</view>
+      <view
+        class="login-tab {{tab === 'admin' ? 'active' : ''}}"
+        data-tab="admin"
+        bindtap="onTabChange"
+      >管理员</view>
+    </view>
+
+    <!-- 用户登录表单 -->
+    <view class="login-form" wx:if="{{tab === 'user'}}">
+      <view class="form-group">
+        <input
+          class="form-input"
+          type="text"
+          placeholder="请输入您的姓名"
+          value="{{name}}"
+          bindinput="onNameInput"
+          bindconfirm="onUserLogin"
+          focus="{{true}}"
+        />
+      </view>
+      <button class="btn btn-primary login-btn" bindtap="onUserLogin" loading="{{loading}}">
+        进入登记
+      </button>
+    </view>
+
+    <!-- 管理员登录表单 -->
+    <view class="login-form" wx:if="{{tab === 'admin'}}">
+      <view class="form-group">
+        <input
+          class="form-input password-input"
+          type="password"
+          placeholder="请输入管理员密码"
+          value="{{password}}"
+          bindinput="onPasswordInput"
+          bindconfirm="onAdminLogin"
+        />
+      </view>
+      <button class="btn btn-primary login-btn" bindtap="onAdminLogin" loading="{{loading}}">
+        管理员登录
+      </button>
+    </view>
+
+    <!-- 底部提示 -->
+    <view class="login-footer">
+      <text class="footer-text" wx:if="{{tab === 'user'}}">输入姓名即可使用，无需注册</text>
+      <text class="footer-text" wx:if="{{tab === 'admin'}}">请输入管理员密码登录后台</text>
+    </view>
+  </view>
+</view>

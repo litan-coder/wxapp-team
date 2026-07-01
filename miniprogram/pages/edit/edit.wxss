@@ -1,0 +1,47 @@
+.container {
+  padding: 24rpx;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 16rpx;
+  padding: 32rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);
+}
+
+.card-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  margin-bottom: 24rpx;
+  color: #333333;
+}
+
+/* 性别选择 */
+.gender-group {
+  display: flex;
+  gap: 24rpx;
+}
+
+.gender-item {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 32rpx;
+  border: 2rpx solid #e8e8e8;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+}
+
+.gender-item.active {
+  border-color: #4f6ef7;
+  background: #f0f4ff;
+}
+
+/* 备注输入框 */
+.remark-input {
+  height: 160rpx;
+}
+
+/* 按钮间距 */
+.btn-group {
+  margin-top: 40rpx;
+}

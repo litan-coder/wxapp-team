@@ -1,0 +1,35 @@
+<view class="entry-card">
+  <!-- 头部：姓名 + 性别标签 -->
+  <view class="entry-header">
+    <text class="entry-name">{{entry.name}}</text>
+    <text class="tag {{entry.gender === '男' ? 'tag-male' : 'tag-female'}}">{{entry.gender}}</text>
+  </view>
+
+  <!-- 信息行 -->
+  <view class="entry-info">
+    <text class="info-item">📱 {{entry.phone}}</text>
+    <text class="info-item">🎂 {{entry.age}}岁</text>
+  </view>
+
+  <!-- 爱好 -->
+  <view wx:if="{{entry.hobby}}" class="entry-hobby">
+    <text class="hobby-label">爱好：</text>
+    <text class="hobby-text">{{entry.hobby}}</text>
+  </view>
+
+  <!-- 备注 -->
+  <view wx:if="{{entry.remark}}" class="entry-remark">
+    <text class="remark-text">{{entry.remark}}</text>
+  </view>
+
+  <!-- 时间 -->
+  <view class="entry-time">
+    <text>登记时间：{{entry.createdAt}}</text>
+  </view>
+
+  <!-- 操作按钮 -->
+  <view class="entry-actions">
+    <button class="action-btn edit-btn" bindtap="onEdit">✏️ 编辑</button>
+    <button class="action-btn delete-btn" bindtap="onDelete">🗑️ 删除</button>
+  </view>
+</view>

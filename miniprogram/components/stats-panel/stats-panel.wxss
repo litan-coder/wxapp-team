@@ -1,0 +1,36 @@
+.stats-grid {
+  display: flex;
+  gap: 16rpx;
+  padding: 24rpx;
+}
+
+.stat-item {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 16rpx;
+  padding: 24rpx 16rpx;
+  text-align: center;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);
+}
+
+.stat-value {
+  display: block;
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #4f6ef7;
+  margin-bottom: 8rpx;
+}
+
+.stat-value.male {
+  color: #1a73e8;
+}
+
+.stat-value.female {
+  color: #d04580;
+}
+
+.stat-label {
+  display: block;
+  font-size: 24rpx;
+  color: #888888;
+}

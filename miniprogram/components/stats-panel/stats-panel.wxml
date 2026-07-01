@@ -1,0 +1,14 @@
+<view class="stats-grid">
+  <view class="stat-item">
+    <text class="stat-value">{{total}}</text>
+    <text class="stat-label">总登记</text>
+  </view>
+  <view class="stat-item">
+    <text class="stat-value male">{{male}}</text>
+    <text class="stat-label">男</text>
+  </view>
+  <view class="stat-item">
+    <text class="stat-value female">{{female}}</text>
+    <text class="stat-label">女</text>
+  </view>
+</view>

@@ -7,7 +7,7 @@
  * 使用方式：
  * 1. 页面 js 中：const swipeBack = require('../../utils/swipe-back')
  * 2. Page({ behaviors: [swipeBack], ... })
- * 3. 页面 wxml 根元素上：catchtouchstart="onSwipeStart" catchtouchmove="onSwipeMove" catchtouchend="onSwipeEnd"
+ * 3. 页面 wxml 根元素上：bindtouchstart="onSwipeStart" bindtouchmove="onSwipeMove" bindtouchend="onSwipeEnd"
  */
 const EDGE_WIDTH = 30;       // 左边缘检测宽度（px）
 const MIN_DISTANCE = 60;     // 最小滑动距离（px）

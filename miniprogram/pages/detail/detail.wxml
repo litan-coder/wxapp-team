@@ -1,4 +1,4 @@
-<view class="container" wx:if="{{entry}}" catchtouchstart="onSwipeStart" catchtouchmove="onSwipeMove" catchtouchend="onSwipeEnd">
+<view class="container" wx:if="{{entry}}" bindtouchstart="onSwipeStart" bindtouchmove="onSwipeMove" bindtouchend="onSwipeEnd">
   <!-- 头像区 -->
   <view class="hero-card">
     <view class="avatar {{entry.gender === '男' ? 'avatar-male' : 'avatar-female'}}">

@@ -1,4 +1,4 @@
-<view class="container" catchtouchstart="onSwipeStart" catchtouchmove="onSwipeMove" catchtouchend="onSwipeEnd">
+<view class="container" bindtouchstart="onSwipeStart" bindtouchmove="onSwipeMove" bindtouchend="onSwipeEnd">
   <view class="card">
     <view class="card-title">✏️ 编辑记录</view>
 

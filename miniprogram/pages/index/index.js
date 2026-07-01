@@ -9,14 +9,20 @@ Page({
   },
 
   onLoad() {
-    // 已登录则根据角色跳转
+    // 已登录则根据角色跳转（仅首次加载时）
     if (auth.isLoggedIn()) {
-      // 使用 reLaunch 确保跳转成功，redirectTo 在 onLoad 中可能不稳定
       if (auth.isAdmin()) {
-        wx.reLaunch({ url: '/pages/admin/admin' });
+        wx.navigateTo({ url: '/pages/admin/admin' });
       } else {
-        wx.reLaunch({ url: '/pages/register/register' });
+        wx.navigateTo({ url: '/pages/register/register' });
       }
+    }
+  },
+
+  onShow() {
+    // 从其他页面返回时，清除登录状态，允许重新登录
+    if (auth.isLoggedIn()) {
+      auth.clearAuth();
     }
   },
 
@@ -47,7 +53,7 @@ Page({
 
     try {
       await auth.doLogin(name);
-      wx.reLaunch({ url: '/pages/register/register' });
+      wx.navigateTo({ url: '/pages/register/register' });
     } catch (e) {
       wx.showToast({ title: e.message || '登录失败', icon: 'none' });
     } finally {
@@ -68,7 +74,7 @@ Page({
 
     try {
       await auth.doAdminLogin(password);
-      wx.reLaunch({ url: '/pages/admin/admin' });
+      wx.navigateTo({ url: '/pages/admin/admin' });
     } catch (e) {
       wx.showToast({ title: e.message || '登录失败', icon: 'none' });
     } finally {

@@ -186,9 +186,9 @@ Page({
       success: (res) => {
         if (!res.confirm) return;
 
-        // 先清除登录状态，再跳转，避免 401 触发的 handle401 导致双重 reLaunch
+        // 先清除登录状态，再返回登录页
         auth.clearAuth();
-        wx.reLaunch({ url: '/pages/index/index' });
+        wx.navigateBack({ delta: 1 });
 
         // 通知后端（fire-and-forget，不阻塞跳转）
         api.logout().catch(() => {});

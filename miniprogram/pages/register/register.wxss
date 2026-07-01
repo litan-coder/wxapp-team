@@ -28,6 +28,29 @@
   margin-top: 4rpx;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.home-btn {
+  font-size: 32rpx;
+  padding: 8rpx 16rpx;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-radius: 8rpx;
+  line-height: 1.4;
+  min-height: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-btn::after {
+  border: none;
+}
+
 .logout-btn {
   font-size: 24rpx;
   padding: 12rpx 24rpx;

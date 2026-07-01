@@ -117,6 +117,13 @@ Page({
     });
   },
 
+  /** 返回首页 */
+  onHome() {
+    auth.clearAuth();
+    wx.reLaunch({ url: '/pages/index/index' });
+    api.logout().catch(() => {});
+  },
+
   /** 退出登录 */
   onLogout() {
     wx.showModal({

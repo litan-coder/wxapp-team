@@ -122,17 +122,15 @@ Page({
     wx.showModal({
       title: '提示',
       content: '确定要退出管理后台吗？',
-      success: async (res) => {
+      success: (res) => {
         if (!res.confirm) return;
 
-        try {
-          await api.logout();
-        } catch (e) {
-          // 忽略退出接口错误
-        }
-
+        // 先清除登录状态，再跳转，避免 401 触发的 handle401 导致双重 reLaunch
         auth.clearAuth();
         wx.reLaunch({ url: '/pages/index/index' });
+
+        // 通知后端（fire-and-forget，不阻塞跳转）
+        api.logout().catch(() => {});
       }
     });
   }

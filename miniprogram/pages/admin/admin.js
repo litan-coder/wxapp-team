@@ -1,7 +1,10 @@
 const api = require('../../utils/api');
 const auth = require('../../utils/auth');
+const swipeBack = require('../../utils/swipe-back');
 
 Page({
+  behaviors: [swipeBack],
+
   data: {
     total: 0,
     maleCount: 0,
@@ -56,6 +59,17 @@ Page({
     } catch (e) {
       wx.showToast({ title: e.message || '加载数据失败', icon: 'none' });
     }
+  },
+
+  /** 查看记录详情 */
+  onViewDetail(e) {
+    const id = e.currentTarget.dataset.id;
+    const entry = this.data.entries.find(item => item.id === id);
+    if (!entry) return;
+
+    const app = getApp();
+    app.globalData.viewEntry = entry;
+    wx.navigateTo({ url: '/pages/detail/detail' });
   },
 
   /** 删除记录 */

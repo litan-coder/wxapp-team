@@ -1,4 +1,4 @@
-<view class="container">
+<view class="container" catchtouchstart="onSwipeStart" catchtouchmove="onSwipeMove" catchtouchend="onSwipeEnd">
   <!-- 顶部栏 -->
   <view class="header">
     <view class="header-left">
@@ -61,7 +61,7 @@
     </view>
 
     <block wx:if="{{entries.length > 0}}">
-      <view class="entry-item" wx:for="{{entries}}" wx:key="id">
+      <view class="entry-item" wx:for="{{entries}}" wx:key="id" bindtap="onViewDetail" data-id="{{item.id}}">
         <view class="entry-header">
           <text class="entry-name">{{item.name}}</text>
           <text class="tag {{item.gender === '男' ? 'tag-male' : 'tag-female'}}">{{item.gender === '男' ? '♂' : '♀'}} {{item.gender}}</text>

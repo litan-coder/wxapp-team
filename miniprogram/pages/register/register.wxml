@@ -1,4 +1,4 @@
-<view class="container">
+<view class="container" catchtouchstart="onSwipeStart" catchtouchmove="onSwipeMove" catchtouchend="onSwipeEnd">
   <!-- 顶部：用户名 + 退出 -->
   <view class="header">
     <view class="header-left">
@@ -36,7 +36,7 @@
 
     <view class="form-group">
       <text class="form-label">手机号 *</text>
-      <input class="form-input" type="number" maxlength="11" placeholder="请输入11位手机号" value="{{form.phone}}" bindinput="onPhoneInput" />
+      <input class="form-input" type="text" maxlength="11" placeholder="请输入11位手机号" value="{{form.phone}}" bindinput="onPhoneInput" />
     </view>
 
     <view class="form-group">

@@ -1,7 +1,10 @@
 const api = require('../../utils/api');
 const auth = require('../../utils/auth');
+const swipeBack = require('../../utils/swipe-back');
 
 Page({
+  behaviors: [swipeBack],
+
   data: {
     name: '',
     total: 0,
@@ -28,8 +31,11 @@ Page({
   },
 
   onShow() {
-    // 每次显示页面时刷新数据（从编辑页返回也会触发）
-    this.loadData();
+    // 从编辑页返回时仅标记需要刷新，避免每次 onShow 都请求
+    if (this._needRefresh) {
+      this._needRefresh = false;
+      this.loadData();
+    }
   },
 
   /** 加载统计和记录 */
@@ -47,7 +53,7 @@ Page({
         femaleCount: stats.femaleCount || 0
       });
     } catch (e) {
-      // 静默处理
+      console.error('加载统计失败:', e);
     }
   },
 
@@ -57,7 +63,7 @@ Page({
       const res = await api.getMyEntries();
       this.setData({ entries: res.entries || [] });
     } catch (e) {
-      // 静默处理
+      console.error('加载记录失败:', e);
     }
   },
 
@@ -85,6 +91,9 @@ Page({
 
   /** 提交登记 */
   async onSubmit() {
+    // 防重复提交
+    if (this.data.submitting) return;
+
     const { form } = this.data;
 
     // 校验
@@ -141,10 +150,9 @@ Page({
 
   /** 编辑记录 */
   onEdit(e) {
-    const entry = e.detail.entry;
-    const app = getApp();
-    app.globalData.editEntry = entry;
-    wx.navigateTo({ url: '/pages/edit/edit' });
+    const id = e.detail.entry.id;
+    this._needRefresh = true;
+    wx.navigateTo({ url: '/pages/edit/edit?id=' + id });
   },
 
   /** 删除记录 */

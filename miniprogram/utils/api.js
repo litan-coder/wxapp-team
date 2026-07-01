@@ -1,5 +1,22 @@
 const config = require('./config');
 
+/** 防重复跳转：多个请求同时返回 401 时只跳转一次 */
+let _relaunching = false;
+
+function handle401() {
+  if (_relaunching) return;
+  _relaunching = true;
+  wx.removeStorageSync('auth_token');
+  wx.removeStorageSync('auth_name');
+  wx.removeStorageSync('auth_role');
+  wx.reLaunch({
+    url: '/pages/index/index',
+    complete() {
+      _relaunching = false;
+    }
+  });
+}
+
 /**
  * 封装 wx.request 为 Promise
  */
@@ -17,10 +34,7 @@ function request(options) {
       },
       success(res) {
         if (res.statusCode === 401) {
-          wx.removeStorageSync('auth_token');
-          wx.removeStorageSync('auth_name');
-          wx.removeStorageSync('auth_role');
-          wx.reLaunch({ url: '/pages/index/index' });
+          handle401();
           reject(new Error('登录已过期，请重新登录'));
           return;
         }
@@ -55,10 +69,7 @@ function rawRequest(options) {
       },
       success(res) {
         if (res.statusCode === 401) {
-          wx.removeStorageSync('auth_token');
-          wx.removeStorageSync('auth_name');
-          wx.removeStorageSync('auth_role');
-          wx.reLaunch({ url: '/pages/index/index' });
+          handle401();
           reject(new Error('登录已过期，请重新登录'));
           return;
         }
@@ -126,6 +137,14 @@ function createEntry(data) {
     url: '/api/entries',
     method: 'POST',
     data
+  });
+}
+
+/** 获取单条记录 */
+function getEntry(id) {
+  return request({
+    url: '/api/entries/' + id,
+    method: 'GET'
   });
 }
 
@@ -233,6 +252,7 @@ module.exports = {
   getStats,
   getMyEntries,
   createEntry,
+  getEntry,
   updateEntry,
   deleteEntry,
   getAllEntries,

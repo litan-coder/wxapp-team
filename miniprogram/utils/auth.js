@@ -46,30 +46,50 @@ function doLogin(name) {
     wx.login({
       success(loginRes) {
         if (!loginRes.code) {
-          reject(new Error('获取微信登录凭证失败'));
+          // 无 code 时降级为普通登录
+          fallbackLogin(name, resolve, reject);
           return;
         }
 
         api.wxLogin(loginRes.code, name)
           .then(data => {
-            wx.setStorageSync('auth_token', data.token);
-            wx.setStorageSync('auth_name', data.name);
-            wx.setStorageSync('auth_role', data.role || 'user');
-
-            const app = getApp();
-            app.globalData.token = data.token;
-            app.globalData.name = data.name;
-            app.globalData.role = data.role || 'user';
-
+            saveAuth(data);
             resolve(data);
           })
-          .catch(reject);
+          .catch(wxErr => {
+            console.warn('微信登录失败，降级为普通登录:', wxErr.message);
+            fallbackLogin(name, resolve, reject);
+          });
       },
       fail() {
-        reject(new Error('微信登录失败'));
+        // wx.login 失败时降级为普通登录
+        console.warn('wx.login 失败，降级为普通登录');
+        fallbackLogin(name, resolve, reject);
       }
     });
   });
+}
+
+/** 降级为普通用户名登录 */
+function fallbackLogin(name, resolve, reject) {
+  api.login({ name })
+    .then(data => {
+      saveAuth(data);
+      resolve(data);
+    })
+    .catch(reject);
+}
+
+/** 保存登录状态到本地存储和 globalData */
+function saveAuth(data) {
+  wx.setStorageSync('auth_token', data.token);
+  wx.setStorageSync('auth_name', data.name);
+  wx.setStorageSync('auth_role', data.role || 'user');
+
+  const app = getApp();
+  app.globalData.token = data.token;
+  app.globalData.name = data.name;
+  app.globalData.role = data.role || 'user';
 }
 
 /**
@@ -80,15 +100,7 @@ function doAdminLogin(password) {
   return new Promise((resolve, reject) => {
     api.login({ password })
       .then(data => {
-        wx.setStorageSync('auth_token', data.token);
-        wx.setStorageSync('auth_name', data.name);
-        wx.setStorageSync('auth_role', data.role);
-
-        const app = getApp();
-        app.globalData.token = data.token;
-        app.globalData.name = data.name;
-        app.globalData.role = data.role;
-
+        saveAuth(data);
         resolve(data);
       })
       .catch(reject);

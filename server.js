@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const helmet = require('helmet');
 const path = require('path');
 const crypto = require('crypto');
 const ExcelJS = require('exceljs');
@@ -10,6 +11,14 @@ const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 const WECHAT_APPID = process.env.WECHAT_APPID || '';
 const WECHAT_SECRET = process.env.WECHAT_SECRET || '';
+
+// 启动时检查密码强度
+if (!process.env.ADMIN_PASSWORD || ADMIN_PASSWORD === 'admin123') {
+  console.warn('⚠️  管理员密码为默认值，请设置 ADMIN_PASSWORD 环境变量更换强密码');
+}
+if (ADMIN_PASSWORD.length < 6) {
+  console.warn('⚠️  管理员密码过短（少于6位），建议使用更复杂的密码');
+}
 
 // ========== 数据库连接 ==========
 if (!process.env.DATABASE_URL) {
@@ -23,6 +32,10 @@ const pool = new Pool({
 });
 
 app.use(express.json());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },  // 允许跨域加载资源
+  contentSecurityPolicy: false  // 小程序无需 CSP
+}));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ========== CORS ==========
@@ -77,6 +90,7 @@ async function initDB() {
     }
   } catch (err) {
     console.error('❌ 数据库初始化失败:', err.message);
+    await pool.end().catch(() => {});
     process.exit(1);
   } finally {
     client.release();
@@ -190,6 +204,7 @@ app.post('/api/wx/login', async (req, res) => {
     const token = createSession({ role: 'user', name: name.trim(), openId: wxData.openid });
     res.json({ token, role: 'user', name: name.trim() });
   } catch (err) {
+    console.error('微信登录异常:', err);
     res.status(500).json({ error: '微信登录服务异常' });
   }
 });
@@ -254,6 +269,7 @@ app.post('/api/entries', authMiddleware, async (req, res) => {
     );
     res.json({ ok: true, entry: { id, name, phone, age: Number(age), gender, hobby: hobby || '', remark: remark || '', createdAt: now, updatedAt: now } });
   } catch (err) {
+    console.error('新增登记失败:', err);
     res.status(500).json({ error: '服务器错误' });
   }
 });
@@ -271,6 +287,24 @@ app.get('/api/my-entries', authMiddleware, async (req, res) => {
     );
     res.json({ entries: result.rows.map(formatEntry) });
   } catch (err) {
+    console.error('查询我的登记失败:', err);
+    res.status(500).json({ error: '服务器错误' });
+  }
+});
+
+// ---------- 用户：根据 ID 查询单条记录 ----------
+app.get('/api/entries/:id', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM reg_team_info WHERE id = $1',
+      [req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: '记录不存在' });
+    }
+    res.json({ entry: formatEntry(result.rows[0]) });
+  } catch (err) {
+    console.error('查询记录详情失败:', err);
     res.status(500).json({ error: '服务器错误' });
   }
 });
@@ -324,6 +358,7 @@ app.put('/api/entries/:id', authMiddleware, async (req, res) => {
     );
     res.json({ ok: true, entry: formatEntry(updated.rows[0]) });
   } catch (err) {
+    console.error('修改登记失败:', err);
     res.status(500).json({ error: '服务器错误' });
   }
 });
@@ -344,6 +379,7 @@ app.delete('/api/entries/:id', authMiddleware, async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
+    console.error('删除登记失败:', err);
     res.status(500).json({ error: '服务器错误' });
   }
 });
@@ -357,6 +393,7 @@ app.get('/api/entries', authMiddleware, async (req, res) => {
     const result = await pool.query('SELECT * FROM reg_team_info ORDER BY created_at DESC');
     res.json({ entries: result.rows.map(formatEntry) });
   } catch (err) {
+    console.error('管理员查询登记失败:', err);
     res.status(500).json({ error: '服务器错误' });
   }
 });
@@ -377,6 +414,7 @@ app.delete('/api/admin/entries/:id', authMiddleware, async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
+    console.error('管理员删除记录失败:', err);
     res.status(500).json({ error: '服务器错误' });
   }
 });
@@ -424,6 +462,7 @@ app.get('/api/stats', authMiddleware, async (req, res) => {
 
     res.json(basicStats);
   } catch (err) {
+    console.error('统计查询失败:', err);
     res.status(500).json({ error: '服务器错误' });
   }
 });
@@ -455,7 +494,7 @@ app.get('/api/export', authMiddleware, async (req, res) => {
 
     sheet.getRow(1).eachCell(cell => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F6EF7' } };
-      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
+      cell.font = { bold: true, color: { argb: 'FF333333' }, size: 12 };
       cell.alignment = { vertical: 'middle', horizontal: 'center' };
       cell.border = {
         top: { style: 'thin' }, bottom: { style: 'thin' },
@@ -493,6 +532,7 @@ app.get('/api/export', authMiddleware, async (req, res) => {
     await workbook.xlsx.write(res);
     res.end();
   } catch (err) {
+    console.error('Excel 导出失败:', err);
     res.status(500).json({ error: '导出失败' });
   }
 });

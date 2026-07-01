@@ -1,7 +1,10 @@
 const api = require('../../utils/api');
 const auth = require('../../utils/auth');
+const swipeBack = require('../../utils/swipe-back');
 
 Page({
+  behaviors: [swipeBack],
+
   data: {
     id: '',
     form: {
@@ -14,35 +17,42 @@ Page({
     submitting: false
   },
 
-  onLoad() {
+  onLoad(options) {
     // 未登录则跳转登录页
     if (!auth.isLoggedIn()) {
       wx.reLaunch({ url: '/pages/index/index' });
       return;
     }
 
-    const app = getApp();
-    const entry = app.globalData.editEntry;
-
-    if (!entry) {
-      wx.showToast({ title: '数据加载失败', icon: 'none' });
+    const id = options.id;
+    if (!id) {
+      wx.showToast({ title: '参数错误', icon: 'none' });
       setTimeout(() => wx.navigateBack(), 1500);
       return;
     }
 
-    this.setData({
-      id: entry.id,
-      form: {
-        age: String(entry.age || ''),
-        gender: entry.gender || '',
-        phone: entry.phone || '',
-        hobby: entry.hobby || '',
-        remark: entry.remark || ''
-      }
-    });
+    this.setData({ id });
+    this.loadEntry(id);
+  },
 
-    // 清除全局数据
-    app.globalData.editEntry = null;
+  /** 从 API 加载记录数据 */
+  async loadEntry(id) {
+    try {
+      const res = await api.getEntry(id);
+      const entry = res.entry;
+      this.setData({
+        form: {
+          age: String(entry.age || ''),
+          gender: entry.gender || '',
+          phone: entry.phone || '',
+          hobby: entry.hobby || '',
+          remark: entry.remark || ''
+        }
+      });
+    } catch (e) {
+      wx.showToast({ title: '数据加载失败', icon: 'none' });
+      setTimeout(() => wx.navigateBack(), 1500);
+    }
   },
 
   // ========== 表单事件 ==========
@@ -69,6 +79,9 @@ Page({
 
   /** 提交修改 */
   async onSubmit() {
+    // 防重复提交
+    if (this.data.submitting) return;
+
     const { id, form } = this.data;
 
     // 校验

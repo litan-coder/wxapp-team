@@ -211,6 +211,26 @@
 .entry-item {
   padding: 24rpx 0;
   border-bottom: 1rpx solid #f0f0f0;
+  position: relative;
+}
+
+.entry-item::after {
+  content: '›';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 40rpx;
+  color: #cccccc;
+  font-weight: 300;
+}
+
+.entry-item:active {
+  background: #f8f9fc;
+  margin: 0 -24rpx;
+  padding-left: 24rpx;
+  padding-right: 24rpx;
+  border-radius: 8rpx;
 }
 
 .entry-item:last-child {

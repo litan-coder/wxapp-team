@@ -13,11 +13,11 @@
  */
 
 // 切换环境：开发用 'dev'，发布用 'prod'
-const ENV = 'dev';
+const ENV = 'prod';
 
 const URLS = {
   dev: 'http://localhost:3000',
-  prod: 'https://team-register-mini.onrender.com'  // 替换为你的 Render 实际域名
+  prod: 'https://wxapp-reg.onrender.com'  // 替换为你的 Render 实际域名
 };
 
 module.exports = {

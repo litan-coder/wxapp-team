@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "wechat-devtools": {
+      "command": "uvx",
+      "args": [
+        "wechat-devtools-mcp"
+      ],
+      "env": {
+        "WECHAT_DEVTOOLS_PATH": "D:/Program Files (x86)/Tencent/微信web开发者工具/cli.bat",
+        "WECHAT_PROJECT_ROOT": "${workspaceFolder}",
+        "WECHAT_DEVTOOLS_PORT": "18470"
+      }
+    }
+  }
+}

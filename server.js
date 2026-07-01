@@ -12,8 +12,13 @@ const WECHAT_APPID = process.env.WECHAT_APPID || '';
 const WECHAT_SECRET = process.env.WECHAT_SECRET || '';
 
 // ========== 数据库连接 ==========
+if (!process.env.DATABASE_URL) {
+  console.error('❌ 缺少 DATABASE_URL 环境变量，请在 .env 文件中配置');
+  process.exit(1);
+}
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_64xvCoVdEmwj@ep-shy-forest-aog32ggz-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require',
+  connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
@@ -21,8 +26,22 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ========== CORS ==========
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  // 如果有配置白名单，只允许白名单中的来源
+  if (ALLOWED_ORIGINS.length > 0) {
+    if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*')) {
+      res.header('Access-Control-Allow-Origin', origin || '*');
+    }
+  } else {
+    // 未配置白名单时，默认只允许同源请求
+    res.header('Access-Control-Allow-Origin', origin || '');
+  }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, X-Auth-Token');
   if (req.method === 'OPTIONS') return res.sendStatus(200);
@@ -65,18 +84,59 @@ async function initDB() {
 }
 
 // ========== Token 会话 ==========
+const SESSION_TTL = 24 * 60 * 60 * 1000; // 会话有效期：24 小时
 const sessions = {};
 
 function generateToken() {
   return crypto.randomBytes(24).toString('hex');
 }
 
+/** 创建会话 */
+function createSession(data) {
+  const token = generateToken();
+  sessions[token] = {
+    ...data,
+    createdAt: Date.now()
+  };
+  return token;
+}
+
+/** 获取会话并检查是否过期 */
+function getSession(token) {
+  const session = sessions[token];
+  if (!session) return null;
+  if (Date.now() - session.createdAt > SESSION_TTL) {
+    delete sessions[token];
+    return null;
+  }
+  return session;
+}
+
+/** 定期清理过期会话，每 30 分钟执行一次 */
+setInterval(() => {
+  const now = Date.now();
+  let cleaned = 0;
+  for (const token in sessions) {
+    if (now - sessions[token].createdAt > SESSION_TTL) {
+      delete sessions[token];
+      cleaned++;
+    }
+  }
+  if (cleaned > 0) {
+    console.log(`🧹 已清理 ${cleaned} 个过期会话`);
+  }
+}, 30 * 60 * 1000);
+
 function authMiddleware(req, res, next) {
   const token = req.headers['x-auth-token'];
-  if (!token || !sessions[token]) {
+  if (!token) {
     return res.status(401).json({ error: '未登录' });
   }
-  req.session = sessions[token];
+  const session = getSession(token);
+  if (!session) {
+    return res.status(401).json({ error: '登录已过期，请重新登录' });
+  }
+  req.session = session;
   req.token = token;
   next();
 }
@@ -127,8 +187,7 @@ app.post('/api/wx/login', async (req, res) => {
       return res.status(400).json({ error: '微信登录失败: ' + (wxData.errmsg || '未知错误') });
     }
 
-    const token = generateToken();
-    sessions[token] = { role: 'user', name: name.trim(), openId: wxData.openid };
+    const token = createSession({ role: 'user', name: name.trim(), openId: wxData.openid });
     res.json({ token, role: 'user', name: name.trim() });
   } catch (err) {
     res.status(500).json({ error: '微信登录服务异常' });
@@ -141,8 +200,7 @@ app.post('/api/login', (req, res) => {
 
   if (password !== undefined && password !== '') {
     if (password === ADMIN_PASSWORD) {
-      const token = generateToken();
-      sessions[token] = { role: 'admin', name: '管理员' };
+      const token = createSession({ role: 'admin', name: '管理员' });
       return res.json({ token, role: 'admin', name: '管理员' });
     }
     return res.status(400).json({ error: '密码错误' });
@@ -152,8 +210,7 @@ app.post('/api/login', (req, res) => {
     return res.status(400).json({ error: '请输入姓名' });
   }
 
-  const token = generateToken();
-  sessions[token] = { role: 'user', name: name.trim() };
+  const token = createSession({ role: 'user', name: name.trim() });
   res.json({ token, role: 'user', name: name.trim() });
 });
 

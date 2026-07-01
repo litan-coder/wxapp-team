@@ -3,7 +3,7 @@
   "projectname": "miniprogram01",
   "condition": {},
   "setting": {
-    "urlCheck": true,
+    "urlCheck": false,
     "coverView": false,
     "lazyloadPlaceholderEnable": false,
     "skylineRenderEnable": false,

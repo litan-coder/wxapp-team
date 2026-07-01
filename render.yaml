@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: team-register-mini
+    env: node
+    region: singapore
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: DATABASE_URL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: WECHAT_APPID
+        sync: false
+      - key: WECHAT_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false

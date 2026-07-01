@@ -5,10 +5,7 @@
       <text class="header-title">团队登记</text>
       <text class="header-user">👤 {{name}}</text>
     </view>
-    <view class="header-right">
-      <button class="home-btn" bindtap="onHome">🏠</button>
-      <button class="logout-btn" bindtap="onLogout">退出</button>
-    </view>
+    <button class="logout-btn" bindtap="onLogout">退出</button>
   </view>
 
   <!-- 统计面板 -->

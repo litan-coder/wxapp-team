@@ -11,10 +11,11 @@ Page({
   onLoad() {
     // 已登录则根据角色跳转
     if (auth.isLoggedIn()) {
+      // 使用 reLaunch 确保跳转成功，redirectTo 在 onLoad 中可能不稳定
       if (auth.isAdmin()) {
-        wx.redirectTo({ url: '/pages/admin/admin' });
+        wx.reLaunch({ url: '/pages/admin/admin' });
       } else {
-        wx.redirectTo({ url: '/pages/register/register' });
+        wx.reLaunch({ url: '/pages/register/register' });
       }
     }
   },
@@ -46,7 +47,7 @@ Page({
 
     try {
       await auth.doLogin(name);
-      wx.redirectTo({ url: '/pages/register/register' });
+      wx.reLaunch({ url: '/pages/register/register' });
     } catch (e) {
       wx.showToast({ title: e.message || '登录失败', icon: 'none' });
     } finally {
@@ -67,7 +68,7 @@ Page({
 
     try {
       await auth.doAdminLogin(password);
-      wx.redirectTo({ url: '/pages/admin/admin' });
+      wx.reLaunch({ url: '/pages/admin/admin' });
     } catch (e) {
       wx.showToast({ title: e.message || '登录失败', icon: 'none' });
     } finally {

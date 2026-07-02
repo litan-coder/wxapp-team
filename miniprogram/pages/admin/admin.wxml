@@ -77,7 +77,10 @@
           <text>🕐 {{item.createdAt}}</text>
         </view>
         <view class="entry-actions">
-          <button class="action-btn delete-btn" bindtap="onDelete" data-id="{{item.id}}">🗑️ 删除</button>
+        <!-- ✅ 关键修改：bindtap 改成 catchtap -->
+          <button class="action-btn delete-btn" catchtap="onDelete" data-id="{{item.id}}"
+          hover-class="btn-hover"
+          >🗑️ 删除</button>
         </view>
       </view>
     </block>

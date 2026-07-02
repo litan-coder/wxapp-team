@@ -298,6 +298,15 @@
 .delete-btn {
   background: #fce8e8;
   color: #e74c3c;
+  border: none;
+  padding: 4rpx 24rpx;
+  border-radius: 20rpx;
+  font-size: 24rpx;
+}
+/* ✅ hover-class 对应的样式 - 按下时的反馈 */
+.btn-hover {
+  opacity: 0.6;           /* 变半透明 */
+  transform: scale(0.92); /* 略微缩小，产生按压感 */
 }
 
 /* 空状态 */

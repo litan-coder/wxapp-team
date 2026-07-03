@@ -5,14 +5,17 @@ const path = require('path');
 const crypto = require('crypto');
 const ExcelJS = require('exceljs');
 const { Pool } = require('pg');
+const { parseHobbies, buildAgeGroups } = require('./lib/stats');
+const { buildOwnerFilter, canAccessEntry } = require('./lib/user-access');
+const { isValidPhone } = require('./lib/validation');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 const WECHAT_APPID = process.env.WECHAT_APPID || '';
 const WECHAT_SECRET = process.env.WECHAT_SECRET || '';
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
-// 启动时检查密码强度
 if (!process.env.ADMIN_PASSWORD || ADMIN_PASSWORD === 'admin123') {
   console.warn('⚠️  管理员密码为默认值，请设置 ADMIN_PASSWORD 环境变量更换强密码');
 }
@@ -20,7 +23,6 @@ if (ADMIN_PASSWORD.length < 6) {
   console.warn('⚠️  管理员密码过短（少于6位），建议使用更复杂的密码');
 }
 
-// ========== 数据库连接 ==========
 if (!process.env.DATABASE_URL) {
   console.error('❌ 缺少 DATABASE_URL 环境变量，请在 .env 文件中配置');
   process.exit(1);
@@ -33,12 +35,11 @@ const pool = new Pool({
 
 app.use(express.json());
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' },  // 允许跨域加载资源
-  contentSecurityPolicy: false  // 小程序无需 CSP
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: false
 }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ========== CORS ==========
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || '')
   .split(',')
   .map(s => s.trim())
@@ -46,13 +47,11 @@ const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || '')
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  // 如果有配置白名单，只允许白名单中的来源
   if (ALLOWED_ORIGINS.length > 0) {
     if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*')) {
       res.header('Access-Control-Allow-Origin', origin || '*');
     }
   } else {
-    // 未配置白名单时，默认只允许同源请求
     res.header('Access-Control-Allow-Origin', origin || '');
   }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -61,7 +60,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// ========== 初始化数据库 ==========
 async function initDB() {
   const client = await pool.connect();
   try {
@@ -69,6 +67,7 @@ async function initDB() {
       CREATE TABLE IF NOT EXISTS reg_team_info (
         id VARCHAR(64) PRIMARY KEY,
         name VARCHAR(50) NOT NULL,
+        open_id VARCHAR(64),
         phone VARCHAR(20) DEFAULT '',
         age INTEGER NOT NULL,
         gender VARCHAR(10) NOT NULL,
@@ -78,10 +77,39 @@ async function initDB() {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);
-    console.log('✅ 数据表 reg_team_info 已就绪');
+    await client.query(`
+      ALTER TABLE reg_team_info ADD COLUMN IF NOT EXISTS open_id VARCHAR(64);
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        token VARCHAR(64) PRIMARY KEY,
+        role VARCHAR(10) NOT NULL,
+        name VARCHAR(50) NOT NULL,
+        open_id VARCHAR(64),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_reg_team_info_open_id ON reg_team_info(open_id);
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_reg_team_info_created_at ON reg_team_info(created_at DESC);
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_reg_team_open_id_phone
+      ON reg_team_info (open_id, phone) WHERE open_id IS NOT NULL;
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_reg_team_name_phone_legacy
+      ON reg_team_info (name, phone) WHERE open_id IS NULL;
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at);
+    `);
+    console.log('✅ 数据表已就绪');
 
     const result = await client.query('SELECT COUNT(*) FROM reg_team_info');
-    if (parseInt(result.rows[0].count) === 0) {
+    if (parseInt(result.rows[0].count, 10) === 0) {
       await client.query(`
         INSERT INTO reg_team_info (id, name, phone, age, gender, hobby, remark)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -97,71 +125,72 @@ async function initDB() {
   }
 }
 
-// ========== Token 会话 ==========
-const SESSION_TTL = 24 * 60 * 60 * 1000; // 会话有效期：24 小时
-const sessions = {};
-
 function generateToken() {
   return crypto.randomBytes(24).toString('hex');
 }
 
-/** 创建会话 */
-function createSession(data) {
+async function createSession(data) {
   const token = generateToken();
-  sessions[token] = {
-    ...data,
-    createdAt: Date.now()
-  };
+  await pool.query(
+    'INSERT INTO sessions (token, role, name, open_id) VALUES ($1, $2, $3, $4)',
+    [token, data.role, data.name, data.openId || null]
+  );
   return token;
 }
 
-/** 获取会话并检查是否过期 */
-function getSession(token) {
-  const session = sessions[token];
-  if (!session) return null;
-  if (Date.now() - session.createdAt > SESSION_TTL) {
-    delete sessions[token];
-    return null;
-  }
-  return session;
+async function getSession(token) {
+  const result = await pool.query(
+    `SELECT role, name, open_id, created_at
+     FROM sessions
+     WHERE token = $1 AND created_at > NOW() - INTERVAL '24 hours'`,
+    [token]
+  );
+  if (result.rows.length === 0) return null;
+  const row = result.rows[0];
+  return {
+    role: row.role,
+    name: row.name,
+    openId: row.open_id,
+    createdAt: new Date(row.created_at).getTime()
+  };
 }
 
-/** 定期清理过期会话，每 30 分钟执行一次 */
-setInterval(() => {
-  const now = Date.now();
-  let cleaned = 0;
-  for (const token in sessions) {
-    if (now - sessions[token].createdAt > SESSION_TTL) {
-      delete sessions[token];
-      cleaned++;
+async function deleteSession(token) {
+  await pool.query('DELETE FROM sessions WHERE token = $1', [token]);
+}
+
+setInterval(async () => {
+  try {
+    const result = await pool.query(
+      `DELETE FROM sessions WHERE created_at < NOW() - INTERVAL '24 hours' RETURNING token`
+    );
+    if (result.rowCount > 0) {
+      console.log(`🧹 已清理 ${result.rowCount} 个过期会话`);
     }
-  }
-  if (cleaned > 0) {
-    console.log(`🧹 已清理 ${cleaned} 个过期会话`);
+  } catch (err) {
+    console.error('清理过期会话失败:', err.message);
   }
 }, 30 * 60 * 1000);
 
-function authMiddleware(req, res, next) {
-  const token = req.headers['x-auth-token'];
-  if (!token) {
-    return res.status(401).json({ error: '未登录' });
+async function authMiddleware(req, res, next) {
+  try {
+    const token = req.headers['x-auth-token'];
+    if (!token) {
+      return res.status(401).json({ error: '未登录' });
+    }
+    const session = await getSession(token);
+    if (!session) {
+      return res.status(401).json({ error: '登录已过期，请重新登录' });
+    }
+    req.session = session;
+    req.token = token;
+    next();
+  } catch (err) {
+    console.error('鉴权失败:', err);
+    res.status(500).json({ error: '服务器错误' });
   }
-  const session = getSession(token);
-  if (!session) {
-    return res.status(401).json({ error: '登录已过期，请重新登录' });
-  }
-  req.session = session;
-  req.token = token;
-  next();
 }
 
-// ========== 手机号校验 ==========
-const PHONE_REGEX = /^1[3-9]\d{9}$/;
-function isValidPhone(phone) {
-  return PHONE_REGEX.test(phone);
-}
-
-// ========== 格式化记录 ==========
 function formatEntry(row) {
   return {
     id: row.id,
@@ -176,9 +205,64 @@ function formatEntry(row) {
   };
 }
 
+async function fetchBasicStats() {
+  const result = await pool.query(`
+    SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE gender = '男')::int AS male_count,
+      COUNT(*) FILTER (WHERE gender = '女')::int AS female_count
+    FROM reg_team_info
+  `);
+  const row = result.rows[0];
+  return {
+    total: row.total,
+    maleCount: row.male_count,
+    femaleCount: row.female_count
+  };
+}
+
+async function fetchAdminStats() {
+  const [basic, ageResult, hobbyResult, entriesResult] = await Promise.all([
+    fetchBasicStats(),
+    pool.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE age < 18)::int AS u18,
+        COUNT(*) FILTER (WHERE age >= 18 AND age <= 25)::int AS a18_25,
+        COUNT(*) FILTER (WHERE age >= 26 AND age <= 35)::int AS a26_35,
+        COUNT(*) FILTER (WHERE age >= 36 AND age <= 45)::int AS a36_45,
+        COUNT(*) FILTER (WHERE age >= 46)::int AS a46_plus
+      FROM reg_team_info
+    `),
+    pool.query(`SELECT hobby FROM reg_team_info WHERE hobby <> ''`),
+    pool.query('SELECT * FROM reg_team_info ORDER BY created_at DESC')
+  ]);
+
+  return {
+    ...basic,
+    ageGroups: buildAgeGroups(ageResult.rows[0]),
+    hobbies: parseHobbies(hobbyResult.rows),
+    entries: entriesResult.rows.map(formatEntry)
+  };
+}
+
+async function checkDuplicatePhone(session, phone, excludeId) {
+  if (session.openId) {
+    const sql = excludeId
+      ? 'SELECT id FROM reg_team_info WHERE open_id = $1 AND phone = $2 AND id != $3'
+      : 'SELECT id FROM reg_team_info WHERE open_id = $1 AND phone = $2';
+    const params = excludeId ? [session.openId, phone, excludeId] : [session.openId, phone];
+    return pool.query(sql, params);
+  }
+
+  const sql = excludeId
+    ? 'SELECT id FROM reg_team_info WHERE name = $1 AND phone = $2 AND open_id IS NULL AND id != $3'
+    : 'SELECT id FROM reg_team_info WHERE name = $1 AND phone = $2 AND open_id IS NULL';
+  const params = excludeId ? [session.name, phone, excludeId] : [session.name, phone];
+  return pool.query(sql, params);
+}
+
 // ==================== 接口 ====================
 
-// ---------- 微信小程序登录 ----------
 app.post('/api/wx/login', async (req, res) => {
   const { code, name } = req.body;
 
@@ -201,7 +285,11 @@ app.post('/api/wx/login', async (req, res) => {
       return res.status(400).json({ error: '微信登录失败: ' + (wxData.errmsg || '未知错误') });
     }
 
-    const token = createSession({ role: 'user', name: name.trim(), openId: wxData.openid });
+    const token = await createSession({
+      role: 'user',
+      name: name.trim(),
+      openId: wxData.openid
+    });
     res.json({ token, role: 'user', name: name.trim() });
   } catch (err) {
     console.error('微信登录异常:', err);
@@ -209,39 +297,46 @@ app.post('/api/wx/login', async (req, res) => {
   }
 });
 
-// ---------- 普通登录（Web 端兼容） ----------
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { name, password } = req.body;
 
-  if (password !== undefined && password !== '') {
-    if (password === ADMIN_PASSWORD) {
-      const token = createSession({ role: 'admin', name: '管理员' });
-      return res.json({ token, role: 'admin', name: '管理员' });
+  try {
+    if (password !== undefined && password !== '') {
+      if (password === ADMIN_PASSWORD) {
+        const token = await createSession({ role: 'admin', name: '管理员' });
+        return res.json({ token, role: 'admin', name: '管理员' });
+      }
+      return res.status(400).json({ error: '密码错误' });
     }
-    return res.status(400).json({ error: '密码错误' });
-  }
 
-  if (!name || !name.trim()) {
-    return res.status(400).json({ error: '请输入姓名' });
-  }
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: '请输入姓名' });
+    }
 
-  const token = createSession({ role: 'user', name: name.trim() });
-  res.json({ token, role: 'user', name: name.trim() });
+    const token = await createSession({ role: 'user', name: name.trim() });
+    res.json({ token, role: 'user', name: name.trim() });
+  } catch (err) {
+    console.error('登录失败:', err);
+    res.status(500).json({ error: '服务器错误' });
+  }
 });
 
-// ---------- 退出登录 ----------
-app.post('/api/logout', authMiddleware, (req, res) => {
-  delete sessions[req.token];
-  res.json({ ok: true });
+app.post('/api/logout', authMiddleware, async (req, res) => {
+  try {
+    await deleteSession(req.token);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('退出登录失败:', err);
+    res.status(500).json({ error: '服务器错误' });
+  }
 });
 
-// ---------- 用户：新增登记 ----------
 app.post('/api/entries', authMiddleware, async (req, res) => {
   if (req.session.role !== 'user') {
     return res.status(403).json({ error: '管理员无需登记' });
   }
 
-  const { name } = req.session;
+  const { name, openId } = req.session;
   const { phone, age, gender, hobby, remark } = req.body;
 
   if (!phone || !age || !gender) {
@@ -252,38 +347,51 @@ app.post('/api/entries', authMiddleware, async (req, res) => {
   }
 
   try {
-    const dup = await pool.query(
-      'SELECT id FROM reg_team_info WHERE name = $1 AND phone = $2',
-      [name, phone]
-    );
+    const dup = await checkDuplicatePhone(req.session, phone);
     if (dup.rows.length > 0) {
-      return res.status(400).json({ error: '该姓名下已存在相同手机号，不允许重复提交！' });
+      return res.status(400).json({ error: '该账号下已存在相同手机号，不允许重复提交！' });
     }
 
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     await pool.query(
-      `INSERT INTO reg_team_info (id, name, phone, age, gender, hobby, remark, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [id, name, phone, Number(age), gender, hobby || '', remark || '', now, now]
+      `INSERT INTO reg_team_info (id, name, open_id, phone, age, gender, hobby, remark, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [id, name, openId || null, phone, Number(age), gender, hobby || '', remark || '', now, now]
     );
-    res.json({ ok: true, entry: { id, name, phone, age: Number(age), gender, hobby: hobby || '', remark: remark || '', createdAt: now, updatedAt: now } });
+    res.json({
+      ok: true,
+      entry: {
+        id,
+        name,
+        phone,
+        age: Number(age),
+        gender,
+        hobby: hobby || '',
+        remark: remark || '',
+        createdAt: now,
+        updatedAt: now
+      }
+    });
   } catch (err) {
+    if (err.code === '23505') {
+      return res.status(400).json({ error: '该账号下已存在相同手机号，不允许重复提交！' });
+    }
     console.error('新增登记失败:', err);
     res.status(500).json({ error: '服务器错误' });
   }
 });
 
-// ---------- 用户：查看自己的登记 ----------
 app.get('/api/my-entries', authMiddleware, async (req, res) => {
   if (req.session.role !== 'user') {
     return res.status(403).json({ error: '无权限' });
   }
 
   try {
+    const owner = buildOwnerFilter(req.session);
     const result = await pool.query(
-      'SELECT * FROM reg_team_info WHERE name = $1 ORDER BY created_at DESC',
-      [req.session.name]
+      `SELECT * FROM reg_team_info WHERE ${owner.clause} ORDER BY created_at DESC`,
+      owner.params
     );
     res.json({ entries: result.rows.map(formatEntry) });
   } catch (err) {
@@ -292,7 +400,6 @@ app.get('/api/my-entries', authMiddleware, async (req, res) => {
   }
 });
 
-// ---------- 用户：根据 ID 查询单条记录 ----------
 app.get('/api/entries/:id', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
@@ -302,20 +409,24 @@ app.get('/api/entries/:id', authMiddleware, async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: '记录不存在' });
     }
-    res.json({ entry: formatEntry(result.rows[0]) });
+
+    const entry = result.rows[0];
+    if (!canAccessEntry(req.session, entry)) {
+      return res.status(403).json({ error: '无权查看该记录' });
+    }
+
+    res.json({ entry: formatEntry(entry) });
   } catch (err) {
     console.error('查询记录详情失败:', err);
     res.status(500).json({ error: '服务器错误' });
   }
 });
 
-// ---------- 用户：修改自己的登记 ----------
 app.put('/api/entries/:id', authMiddleware, async (req, res) => {
   if (req.session.role !== 'user') {
     return res.status(403).json({ error: '管理员无需修改' });
   }
 
-  const { name } = req.session;
   const { phone, age, gender, hobby, remark } = req.body;
 
   if (phone && !isValidPhone(phone)) {
@@ -323,9 +434,10 @@ app.put('/api/entries/:id', authMiddleware, async (req, res) => {
   }
 
   try {
+    const owner = buildOwnerFilter(req.session);
     const result = await pool.query(
-      'SELECT * FROM reg_team_info WHERE id = $1 AND name = $2',
-      [req.params.id, name]
+      `SELECT * FROM reg_team_info WHERE id = $1 AND ${owner.clause}`,
+      [req.params.id, ...owner.params]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: '记录不存在或无权修改' });
@@ -334,12 +446,9 @@ app.put('/api/entries/:id', authMiddleware, async (req, res) => {
     const entry = result.rows[0];
 
     if (phone && phone !== entry.phone) {
-      const dup = await pool.query(
-        'SELECT id FROM reg_team_info WHERE name = $1 AND phone = $2 AND id != $3',
-        [name, phone, req.params.id]
-      );
+      const dup = await checkDuplicatePhone(req.session, phone, req.params.id);
       if (dup.rows.length > 0) {
-        return res.status(400).json({ error: '该姓名下已存在相同手机号，不允许重复提交！' });
+        return res.status(400).json({ error: '该账号下已存在相同手机号，不允许重复提交！' });
       }
     }
 
@@ -358,21 +467,24 @@ app.put('/api/entries/:id', authMiddleware, async (req, res) => {
     );
     res.json({ ok: true, entry: formatEntry(updated.rows[0]) });
   } catch (err) {
+    if (err.code === '23505') {
+      return res.status(400).json({ error: '该账号下已存在相同手机号，不允许重复提交！' });
+    }
     console.error('修改登记失败:', err);
     res.status(500).json({ error: '服务器错误' });
   }
 });
 
-// ---------- 用户：删除自己的登记 ----------
 app.delete('/api/entries/:id', authMiddleware, async (req, res) => {
   if (req.session.role !== 'user') {
     return res.status(403).json({ error: '管理员无需删除' });
   }
 
   try {
+    const owner = buildOwnerFilter(req.session);
     const result = await pool.query(
-      'DELETE FROM reg_team_info WHERE id = $1 AND name = $2 RETURNING id',
-      [req.params.id, req.session.name]
+      `DELETE FROM reg_team_info WHERE id = $1 AND ${owner.clause} RETURNING id`,
+      [req.params.id, ...owner.params]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: '记录不存在或无权删除' });
@@ -384,7 +496,6 @@ app.delete('/api/entries/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// ---------- 管理员：查看所有登记 ----------
 app.get('/api/entries', authMiddleware, async (req, res) => {
   if (req.session.role !== 'admin') {
     return res.status(403).json({ error: '无权限' });
@@ -398,7 +509,6 @@ app.get('/api/entries', authMiddleware, async (req, res) => {
   }
 });
 
-// ---------- 管理员：删除任意记录 ----------
 app.delete('/api/admin/entries/:id', authMiddleware, async (req, res) => {
   if (req.session.role !== 'admin') {
     return res.status(403).json({ error: '无权限' });
@@ -419,55 +529,18 @@ app.delete('/api/admin/entries/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// ---------- 统计接口 ----------
 app.get('/api/stats', authMiddleware, async (req, res) => {
   try {
-    const all = await pool.query('SELECT * FROM reg_team_info');
-    const entries = all.rows;
-
-    const total = entries.length;
-    const maleCount = entries.filter(e => e.gender === '男').length;
-    const femaleCount = entries.filter(e => e.gender === '女').length;
-
-    const ageGroups = { '18以下': 0, '18-25': 0, '26-35': 0, '36-45': 0, '46以上': 0 };
-    entries.forEach(e => {
-      const age = e.age;
-      if (age < 18) ageGroups['18以下']++;
-      else if (age <= 25) ageGroups['18-25']++;
-      else if (age <= 35) ageGroups['26-35']++;
-      else if (age <= 45) ageGroups['36-45']++;
-      else ageGroups['46以上']++;
-    });
-
-    const hobbyMap = {};
-    entries.forEach(e => {
-      if (e.hobby) {
-        e.hobby.split(/[,，、\s]+/).forEach(h => {
-          h = h.trim();
-          if (h) hobbyMap[h] = (hobbyMap[h] || 0) + 1;
-        });
-      }
-    });
-
-    const basicStats = { total, maleCount, femaleCount };
-
     if (req.session.role === 'admin') {
-      return res.json({
-        ...basicStats,
-        ageGroups,
-        hobbies: hobbyMap,
-        entries: entries.map(formatEntry)
-      });
+      return res.json(await fetchAdminStats());
     }
-
-    res.json(basicStats);
+    res.json(await fetchBasicStats());
   } catch (err) {
     console.error('统计查询失败:', err);
     res.status(500).json({ error: '服务器错误' });
   }
 });
 
-// ---------- 管理员：导出 Excel ----------
 app.get('/api/export', authMiddleware, async (req, res) => {
   if (req.session.role !== 'admin') {
     return res.status(403).json({ error: '无权限' });
@@ -537,15 +610,31 @@ app.get('/api/export', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== 健康检查 ==========
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', source: 'miniprogram' });
 });
 
-// ========== 启动 ==========
-initDB().then(() => {
+async function startServer() {
+  await initDB();
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ 小程序后端已启动: http://localhost:${PORT}`);
-    console.log(`📡 微信登录: ${process.env.WECHAT_APPID? '已配置' : '❌ 未配置 WECHAT_APPID'}`);
+    console.log(`📡 微信登录: ${process.env.WECHAT_APPID ? '已配置' : '❌ 未配置 WECHAT_APPID'}`);
   });
-});
+}
+
+if (require.main === module) {
+  startServer().catch(err => {
+    console.error('启动失败:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  app,
+  pool,
+  initDB,
+  startServer,
+  isValidPhone,
+  formatEntry,
+  SESSION_TTL_MS
+};

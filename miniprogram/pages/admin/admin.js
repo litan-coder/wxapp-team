@@ -43,18 +43,13 @@ Page({
         .sort((a, b) => b[1] - a[1])
         .map(([name, count]) => ({ name, count }));
 
-      // 处理登记列表（按时间倒序）
-      const entries = (stats.entries || []).sort((a, b) => {
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      });
-
       this.setData({
         total: stats.total || 0,
         maleCount: stats.maleCount || 0,
         femaleCount: stats.femaleCount || 0,
         ageGroups: ageList,
         hobbies,
-        entries
+        entries: stats.entries || []
       });
     } catch (e) {
       wx.showToast({ title: e.message || '加载数据失败', icon: 'none' });

@@ -17,56 +17,31 @@ function handle401() {
   });
 }
 
-/**
- * 封装 wx.request 为 Promise
- */
-function request(options) {
-  return new Promise((resolve, reject) => {
-    const token = wx.getStorageSync('auth_token');
-
-    wx.request({
-      url: config.BASE_URL + options.url,
-      method: options.method || 'GET',
-      data: options.data || {},
-      header: {
-        'Content-Type': 'application/json',
-        'X-Auth-Token': token || ''
-      },
-      success(res) {
-        if (res.statusCode === 401) {
-          handle401();
-          reject(new Error('登录已过期，请重新登录'));
-          return;
-        }
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(res.data);
-        } else {
-          const msg = (res.data && res.data.error) || '请求失败';
-          reject(new Error(msg));
-        }
-      },
-      fail(err) {
-        reject(new Error('网络请求失败，请检查网络'));
-      }
-    });
-  });
+function getAuthToken() {
+  return wx.getStorageSync('auth_token') || '';
 }
 
 /**
- * 原始请求（用于下载二进制文件等场景）
+ * 底层请求封装
+ * @param {object} options
+ * @param {boolean} options.raw - 为 true 时返回完整 response，否则返回 res.data
  */
-function rawRequest(options) {
+function doRequest(options) {
   return new Promise((resolve, reject) => {
-    const token = wx.getStorageSync('auth_token');
+    const isBinary = options.responseType === 'arraybuffer';
+    const header = {
+      'X-Auth-Token': getAuthToken()
+    };
+    if (!isBinary) {
+      header['Content-Type'] = 'application/json';
+    }
 
     wx.request({
       url: config.BASE_URL + options.url,
       method: options.method || 'GET',
       data: options.data || {},
       responseType: options.responseType || 'text',
-      header: {
-        'X-Auth-Token': token || ''
-      },
+      header,
       success(res) {
         if (res.statusCode === 401) {
           handle401();
@@ -74,22 +49,27 @@ function rawRequest(options) {
           return;
         }
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(res);
+          resolve(options.raw ? res : res.data);
         } else {
           const msg = (res.data && res.data.error) || '请求失败';
           reject(new Error(msg));
         }
       },
-      fail(err) {
+      fail() {
         reject(new Error('网络请求失败，请检查网络'));
       }
     });
   });
 }
 
-// ========== API 方法 ==========
+function request(options) {
+  return doRequest(options);
+}
 
-/** 微信登录 */
+function rawRequest(options) {
+  return doRequest({ ...options, raw: true });
+}
+
 function wxLogin(code, name) {
   return request({
     url: '/api/wx/login',
@@ -98,7 +78,6 @@ function wxLogin(code, name) {
   });
 }
 
-/** 普通登录（用户/管理员） */
 function login(data) {
   return request({
     url: '/api/login',
@@ -107,7 +86,6 @@ function login(data) {
   });
 }
 
-/** 退出登录 */
 function logout() {
   return request({
     url: '/api/logout',
@@ -115,7 +93,6 @@ function logout() {
   });
 }
 
-/** 获取统计数据 */
 function getStats() {
   return request({
     url: '/api/stats',
@@ -123,7 +100,6 @@ function getStats() {
   });
 }
 
-/** 获取我的登记记录 */
 function getMyEntries() {
   return request({
     url: '/api/my-entries',
@@ -131,7 +107,6 @@ function getMyEntries() {
   });
 }
 
-/** 新增登记 */
 function createEntry(data) {
   return request({
     url: '/api/entries',
@@ -140,7 +115,6 @@ function createEntry(data) {
   });
 }
 
-/** 获取单条记录 */
 function getEntry(id) {
   return request({
     url: '/api/entries/' + id,
@@ -148,7 +122,6 @@ function getEntry(id) {
   });
 }
 
-/** 修改登记 */
 function updateEntry(id, data) {
   return request({
     url: '/api/entries/' + id,
@@ -157,7 +130,6 @@ function updateEntry(id, data) {
   });
 }
 
-/** 删除登记 */
 function deleteEntry(id) {
   return request({
     url: '/api/entries/' + id,
@@ -165,9 +137,6 @@ function deleteEntry(id) {
   });
 }
 
-// ========== 管理员接口 ==========
-
-/** 管理员：获取所有登记记录 */
 function getAllEntries() {
   return request({
     url: '/api/entries',
@@ -175,7 +144,6 @@ function getAllEntries() {
   });
 }
 
-/** 管理员：删除任意记录 */
 function adminDeleteEntry(id) {
   return request({
     url: '/api/admin/entries/' + id,
@@ -183,65 +151,40 @@ function adminDeleteEntry(id) {
   });
 }
 
-/**
- * 管理员：导出 Excel
- * 微信小程序中需要先下载文件再打开
- */
 function exportExcel() {
   return new Promise((resolve, reject) => {
-    const token = wx.getStorageSync('auth_token');
-
-    wx.request({
-      url: config.BASE_URL + '/api/export',
+    rawRequest({
+      url: '/api/export',
       method: 'GET',
-      responseType: 'arraybuffer',
-      header: {
-        'X-Auth-Token': token || ''
-      },
-      success(res) {
-        if (res.statusCode === 401) {
-          wx.removeStorageSync('auth_token');
-          wx.removeStorageSync('auth_name');
-          wx.removeStorageSync('auth_role');
-          wx.reLaunch({ url: '/pages/index/index' });
-          reject(new Error('登录已过期，请重新登录'));
-          return;
-        }
-        if (res.statusCode === 200) {
-          // 写入临时文件
-          const fs = wx.getFileSystemManager();
-          const fileName = '团队登记_' + new Date().toLocaleDateString('zh-CN').replace(/\//g, '-') + '.xlsx';
-          const filePath = wx.env.USER_DATA_PATH + '/' + fileName;
+      responseType: 'arraybuffer'
+    })
+      .then(res => {
+        const fs = wx.getFileSystemManager();
+        const fileName = '团队登记_' + new Date().toLocaleDateString('zh-CN').replace(/\//g, '-') + '.xlsx';
+        const filePath = wx.env.USER_DATA_PATH + '/' + fileName;
 
-          fs.writeFile({
-            filePath: filePath,
-            data: res.data,
-            success() {
-              // 打开文件
-              wx.openDocument({
-                filePath: filePath,
-                fileType: 'xlsx',
-                showMenu: true,
-                success() {
-                  resolve({ ok: true });
-                },
-                fail(err) {
-                  reject(new Error('打开文件失败: ' + (err.errMsg || '')));
-                }
-              });
-            },
-            fail(err) {
-              reject(new Error('文件保存失败: ' + (err.errMsg || '')));
-            }
-          });
-        } else {
-          reject(new Error('导出失败'));
-        }
-      },
-      fail(err) {
-        reject(new Error('网络请求失败，请检查网络'));
-      }
-    });
+        fs.writeFile({
+          filePath,
+          data: res.data,
+          success() {
+            wx.openDocument({
+              filePath,
+              fileType: 'xlsx',
+              showMenu: true,
+              success() {
+                resolve({ ok: true });
+              },
+              fail(err) {
+                reject(new Error('打开文件失败: ' + (err.errMsg || '')));
+              }
+            });
+          },
+          fail(err) {
+            reject(new Error('文件保存失败: ' + (err.errMsg || '')));
+          }
+        });
+      })
+      .catch(reject);
   });
 }
 

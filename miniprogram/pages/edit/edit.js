@@ -1,6 +1,7 @@
 const api = require('../../utils/api');
 const auth = require('../../utils/auth');
 const swipeBack = require('../../utils/swipe-back');
+const { validateEntryForm } = require('../../utils/validate');
 
 Page({
   behaviors: [swipeBack],
@@ -18,7 +19,6 @@ Page({
   },
 
   onLoad(options) {
-    // 未登录则跳转登录页
     if (!auth.isLoggedIn()) {
       wx.reLaunch({ url: '/pages/index/index' });
       return;
@@ -35,7 +35,6 @@ Page({
     this.loadEntry(id);
   },
 
-  /** 从 API 加载记录数据 */
   async loadEntry(id) {
     try {
       const res = await api.getEntry(id);
@@ -54,8 +53,6 @@ Page({
       setTimeout(() => wx.navigateBack(), 1500);
     }
   },
-
-  // ========== 表单事件 ==========
 
   onAgeInput(e) {
     this.setData({ 'form.age': e.detail.value });
@@ -77,41 +74,21 @@ Page({
     this.setData({ 'form.remark': e.detail.value });
   },
 
-  /** 提交修改 */
   async onSubmit() {
-    // 防重复提交
     if (this.data.submitting) return;
 
+    const result = validateEntryForm(this.data.form);
+    if (!result.ok) {
+      wx.showToast({ title: result.message, icon: 'none' });
+      return;
+    }
+
     const { id, form } = this.data;
-
-    // 校验
-    if (!form.age) {
-      wx.showToast({ title: '请输入年龄', icon: 'none' });
-      return;
-    }
-    const age = Number(form.age);
-    if (isNaN(age) || age < 1 || age > 150) {
-      wx.showToast({ title: '请输入有效年龄', icon: 'none' });
-      return;
-    }
-    if (!form.gender) {
-      wx.showToast({ title: '请选择性别', icon: 'none' });
-      return;
-    }
-    if (!form.phone) {
-      wx.showToast({ title: '请输入手机号', icon: 'none' });
-      return;
-    }
-    if (!/^1[3-9]\d{9}$/.test(form.phone)) {
-      wx.showToast({ title: '请输入正确的11位手机号', icon: 'none' });
-      return;
-    }
-
     this.setData({ submitting: true });
 
     try {
       await api.updateEntry(id, {
-        age: age,
+        age: result.age,
         gender: form.gender,
         phone: form.phone,
         hobby: form.hobby,

@@ -1,4 +1,5 @@
 const swipeBack = require('../../utils/swipe-back');
+const { getAgeGroupDisplay } = require('../../utils/validate');
 
 Page({
   behaviors: [swipeBack],
@@ -18,22 +19,14 @@ Page({
       return;
     }
 
-    // 计算年龄段
-    const age = entry.age;
-    let ageGroup = '';
-    if (age < 18) ageGroup = '18岁以下';
-    else if (age <= 25) ageGroup = '18-25岁';
-    else if (age <= 35) ageGroup = '26-35岁';
-    else if (age <= 45) ageGroup = '36-45岁';
-    else ageGroup = '46岁以上';
+    this.setData({
+      entry,
+      ageGroup: getAgeGroupDisplay(entry.age)
+    });
 
-    this.setData({ entry, ageGroup });
-
-    // 清除全局数据
     app.globalData.viewEntry = null;
   },
 
-  /** 格式化时间 */
   formatTime(dateStr) {
     if (!dateStr) return '';
     const d = new Date(dateStr);

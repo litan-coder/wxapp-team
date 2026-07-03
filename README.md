@@ -26,7 +26,8 @@ team-register-mini/
 │   ├── utils/
 │   │   ├── api.js                # 统一 wx.request 封装 & 全部接口
 │   │   ├── auth.js               # 登录/退出/角色管理
-│   │   └── config.js             # 后端地址配置
+│   │   ├── config.js             # 后端地址配置
+│   │   └── validate.js           # 表单校验 & 本地统计计算
 │   ├── components/
 │   │   ├── entry-item/           # 登记记录条目组件
 │   │   └── stats-panel/          # 统计面板组件
@@ -35,6 +36,11 @@ team-register-mini/
 │       ├── register/             # 用户主页
 │       ├── edit/                 # 编辑登记
 │       └── admin/                # 管理员后台
+├── lib/                          # 后端公共模块
+│   ├── stats.js                  # 统计聚合辅助
+│   ├── user-access.js            # openId 权限过滤
+│   └── validation.js             # 手机号校验
+├── test/                         # 单元测试（npm test）
 ├── server.js                     # 后端服务（Express + PostgreSQL）
 ├── package.json
 ├── .env                          # 环境变量（数据库、微信配置）
@@ -50,6 +56,7 @@ cd team-register-mini
 npm install
 cp .env.example .env        # 编辑 .env 填入真实配置
 npm start
+npm test        # 运行单元测试
 ```
 
 `.env` 配置项：
@@ -121,5 +128,19 @@ module.exports = {
 
 - **前端**：微信小程序原生（WXML + WXSS + JavaScript），无第三方框架
 - **后端**：Node.js + Express + PostgreSQL（Neon）
-- **认证**：Token 会话机制（X-Auth-Token）
+- **认证**：Token 会话机制（X-Auth-Token），Session 持久化到 PostgreSQL
+- **数据隔离**：微信登录用户按 `openId` 隔离登记数据，单条记录有权限校验
+- **统计性能**：`/api/stats` 使用 SQL 聚合，避免全表加载
 - **不使用** web-view 套壳，可满足微信审核要求
+
+## 测试
+
+```bash
+npm test
+```
+
+覆盖表单校验、权限过滤、统计聚合等核心逻辑（10 项单元测试）。
+
+## 升级说明
+
+若从旧版本升级，重启后端后会自动迁移数据库（新增 `open_id` 字段和 `sessions` 表）。已有旧数据的 `open_id` 为空，用户需**重新微信登录**后，新登记才会绑定 openId 并正确隔离。
